@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PyIntelMeet — Интеллектуальная платформа видеоконференций</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+body{font-family:Inter,system-ui,sans-serif} .mono{font-family:JetBrains Mono,monospace}
+.tech-gradient{background:linear-gradient(135deg,#18181b 0%,#27251f 100%)}
+.video-tile{transition:all .2s cubic-bezier(.4,0,.2,1);background:#111113;border:1px solid #3f3f46;position:relative;overflow:hidden}
+.video-tile.active{border-color:#22d3ee;box-shadow:0 0 0 1px #22d3ee}
+.video-tile video{width:100%;height:100%;object-fit:cover;background:#09090b}
+.participant-label{background:linear-gradient(to bottom,rgba(0,0,0,.75),rgba(0,0,0,.85));backdrop-filter:blur(8px)}
+.status-dot{width:9px;height:9px;box-shadow:0 0 0 2px rgba(63,63,70,.6)}
+.nav-active{background-color:#27251f;color:#f4f4f5;border-radius:6px}
+.transcript-line{padding:6px 10px;border-radius:6px;transition:background .1s}
+.transcript-line:hover{background:#27251f}
+.meeting-card{transition:transform .1s ease,box-shadow .1s ease}
+.meeting-card:hover{transform:translateY(-1px);box-shadow:0 10px 15px -3px rgb(0 0 0 / .1)}
+.control-btn{transition:all .1s cubic-bezier(.4,0,.2,1)}
+.control-btn:hover{transform:translateY(-1px)}
+.modal{animation:modalPop .18s cubic-bezier(.32,.72,0,1)}
+@keyframes modalPop{from{transform:scale(.96) translateY(10px);opacity:0}to{transform:scale(1) translateY(0);opacity:1}}
+.video-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.prose-report h2{font-size:1.05rem;margin-top:1.25rem;margin-bottom:.4rem;color:#e4e4e7}
+.live-dot{animation:pulse 2s cubic-bezier(.4,0,.6,1) infinite}
+.speaker-tag{font-size:10px;padding:0 6px;border-radius:3px;background:#3f3f46;color:#a1a1aa}
+</style></head>
+<body class="bg-zinc-950 text-zinc-200">
+<!-- LANDING -->
+<div id="landing-view">
+<nav class="border-b border-zinc-800 bg-zinc-950/95 backdrop-blur sticky top-0 z-50">
+<div class="max-w-screen-xl mx-auto px-6 py-4 flex items-center justify-between">
+<div class="flex items-center gap-x-3"><div class="w-9 h-9 bg-cyan-400 flex items-center justify-center rounded-xl"><i class="fa-solid fa-brain text-zinc-950 text-3xl"></i></div>
+<div><span class="font-semibold tracking-tighter text-3xl">PyIntelMeet</span><span class="ml-1 text-xs font-mono bg-zinc-900 text-cyan-400 px-1.5 py-px rounded">v1.0 MVP</span></div></div>
+<div class="flex items-center gap-x-2 text-sm">
+<div onclick="showResearchModal()" class="cursor-pointer flex items-center gap-x-2 px-3.5 py-1.5 hover:bg-zinc-900 rounded-lg text-zinc-400 hover:text-zinc-200"><i class="fa-solid fa-flask"></i><span class="font-medium">Исследование KB</span></div>
+<div onclick="showReportsView()" class="cursor-pointer px-4 py-1.5 text-sm font-medium flex items-center gap-x-2 hover:bg-zinc-900 rounded-lg"><i class="fa-solid fa-history"></i><span>Мои отчёты</span></div>
+</div></div></nav>
+<div class="max-w-screen-xl mx-auto px-6 pt-16 pb-20">
+<div class="max-w-3xl">
+<div class="inline-flex items-center gap-x-2 bg-zinc-900 text-cyan-400 text-xs font-semibold tracking-[1.5px] px-4 py-1 rounded-full mb-6 border border-zinc-800"><div class="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-pulse"></div>НИР • 2026 • НИУ МЭИ</div>
+<h1 class="text-7xl font-semibold tracking-tighter leading-none mb-4">Интеллектуальная<br>видеоконференц-платформа</h1>
+<p class="max-w-md text-2xl text-zinc-400 font-light tracking-tight">С RAG-коррекцией речи по базе знаний и автоматической генерацией отчётов.</p>
+<div class="flex items-center gap-x-3 mt-9">
+<button onclick="showCreateRoomModal()" class="px-8 h-14 rounded-2xl bg-white text-zinc-950 font-semibold flex items-center gap-x-2 text-lg hover:bg-zinc-100 active:scale-[0.985] transition-all shadow-xl shadow-black/40"><i class="fa-solid fa-plus"></i><span>Создать комнату</span></button>
+<button onclick="showJoinModal()" class="px-7 h-14 rounded-2xl border border-zinc-700 hover:bg-zinc-900 transition flex items-center gap-x-3 text-lg font-medium"><i class="fa-solid fa-link"></i><span>Присоединиться</span></button>
+<button onclick="createDemoRoom()" class="ml-2 px-6 h-14 text-base flex items-center gap-x-2 text-cyan-400 hover:text-cyan-300 transition font-medium"><i class="fa-solid fa-magic"></i><span>Демо-комната</span></button>
+</div>
+<div class="flex items-center gap-5 mt-8 text-xs text-zinc-500">
+<div class="flex items-center"><i class="fa-solid fa-check mr-1.5 text-emerald-400"></i> P2P WebRTC</div>
+<div class="flex items-center"><i class="fa-solid fa-check mr-1.5 text-emerald-400"></i> Живые субтитры ru-RU</div>
+<div class="flex items-center"><i class="fa-solid fa-check mr-1.5 text-emerald-400"></i> Хрома + RAG</div>
+<div class="flex items-center"><i class="fa-solid fa-check mr-1.5 text-emerald-400"></i> Автоотчёты</div>
+</div></div></div></div></div>
+
+<!-- ROOM VIEW -->
+<div id="room-view" class="hidden flex flex-col h-screen">
+<div class="room-header px-5 py-3 flex items-center justify-between shrink-0 z-40" style="background:#18181b;border-bottom:1px solid #3f3f46">
+<div class="flex items-center gap-x-4">
+<div><div class="flex items-baseline gap-x-3"><span id="room-title" class="font-semibold text-2xl tracking-tight"></span>
+<span id="room-code-pill" onclick="copyInviteLink()" class="cursor-pointer stat-pill text-cyan-400 font-mono text-sm px-3 py-px flex items-center gap-1"><i class="fa-solid fa-copy text-xs"></i> <span id="room-code"></span></span></div>
+<div class="text-xs text-zinc-400 flex items-center gap-2 mt-px"><span id="participant-count"></span><span class="text-zinc-600">•</span><span id="meeting-timer" class="font-mono text-emerald-400">00:00</span></div></div></div>
+<div class="flex items-center gap-x-2">
+<button onclick="showInviteModal()" class="flex items-center px-4 py-2 text-sm font-medium rounded-xl border border-zinc-700 hover:bg-zinc-900 transition gap-x-2"><i class="fa-solid fa-user-plus"></i><span>Пригласить</span></button>
+<div id="host-controls" class="hidden"><button onclick="endMeeting()" class="flex items-center px-5 py-2 bg-red-600 hover:bg-red-500 text-white font-semibold text-sm rounded-xl transition gap-x-2"><i class="fa-solid fa-sign-out-alt"></i><span>Завершить встречу</span></button></div>
+<button onclick="leaveRoom()" class="px-3 py-2 text-sm rounded-xl hover:bg-zinc-900 flex items-center gap-x-1.5 text-zinc-400 hover:text-zinc-200 border border-zinc-800"><i class="fa-solid fa-door-open"></i></button>
+</div></div>
+<div class="flex flex-1 overflow-hidden">
+<div class="flex-1 p-5 overflow-auto bg-zinc-950" id="video-area"><div id="video-grid" class="video-grid"></div></div>
+<div class="w-80 border-l border-zinc-800 bg-zinc-900 flex flex-col shrink-0">
+<div class="flex border-b border-zinc-800 px-1 pt-1 text-sm shrink-0">
+<div onclick="switchSidebarTab('participants')" id="tab-participants" class="flex-1 text-center py-2.5 cursor-pointer font-medium nav-active">Участники</div>
+<div onclick="switchSidebarTab('transcript')" id="tab-transcript" class="flex-1 text-center py-2.5 cursor-pointer font-medium text-zinc-400 hover:text-zinc-200">Транскрипция</div>
+<div onclick="switchSidebarTab('chat')" id="tab-chat" class="flex-1 text-center py-2.5 cursor-pointer font-medium text-zinc-400 hover:text-zinc-200">Чат</div>
+</div>
+<div id="sidebar-participants" class="flex-1 overflow-auto p-3"><div id="participants-list" class="space-y-1 text-sm"></div></div>
+<div id="sidebar-transcript" class="hidden flex-1 flex flex-col overflow-hidden">
+<div class="px-3 pt-2 pb-1 flex items-center justify-between text-xs"><div class="flex items-center gap-x-2 text-emerald-400 font-medium"><i class="fa-solid fa-microphone live-dot"></i><span>ЖИВЫЕ СУБТИТРЫ</span></div><button onclick="clearLocalTranscript()" class="text-zinc-400 hover:text-zinc-300 px-2"><i class="fa-solid fa-trash text-xs"></i></button></div>
+<div id="live-transcript" class="flex-1 overflow-y-auto px-3 pb-3 space-y-1 text-sm font-light bg-zinc-950 border-t border-zinc-800"></div>
+<div class="p-2 text-[10px] border-t border-zinc-800 text-zinc-400 flex items-center justify-between px-3"><div>ru-RU • браузер</div><div id="stt-status" class="font-mono text-[10px]">ОЖИДАНИЕ</div></div>
+</div>
+<div id="sidebar-chat" class="hidden flex-1 flex flex-col overflow-hidden"><div id="chat-messages" class="flex-1 overflow-y-auto p-3 space-y-3 text-sm bg-zinc-950"></div><div class="p-2 border-t border-zinc-800"><div class="flex gap-2"><input id="chat-input" onkeydown="if(event.key==='Enter')sendChatMessage()" class="flex-1 bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-sm outline-none focus:border-cyan-400" placeholder="Сообщение..."><button onclick="sendChatMessage()" class="px-4 bg-zinc-800 hover:bg-zinc-700 rounded-xl"><i class="fa-solid fa-paper-plane"></i></button></div></div></div>
+</div></div>
+<div class="shrink-0 bg-zinc-900 border-t border-zinc-800 px-5 py-4">
+<div class="max-w-[980px] mx-auto flex items-center justify-between gap-x-3">
+<div class="flex items-center gap-x-2">
+<button id="btn-mic" onclick="toggleMic()" class="control-btn flex items-center gap-x-2.5 px-5 h-11 rounded-2xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 font-medium"><i class="fa-solid fa-microphone text-emerald-400" id="mic-icon"></i><span id="mic-label">Микрофон</span></button>
+<button id="btn-cam" onclick="toggleCam()" class="control-btn flex items-center gap-x-2.5 px-5 h-11 rounded-2xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 font-medium"><i class="fa-solid fa-video text-emerald-400" id="cam-icon"></i><span id="cam-label">Камера</span></button>
+<button id="btn-screen" onclick="toggleScreenShare()" class="control-btn flex items-center gap-x-2 px-4 h-11 rounded-2xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 font-medium"><i class="fa-solid fa-desktop"></i><span id="screen-label">Экран</span></button>
+</div>
+<div class="flex items-center gap-x-px text-xs text-zinc-400"><div class="px-3 py-1 bg-zinc-950 rounded-l-2xl border border-zinc-800">P2P Mesh</div><div id="conn-quality" class="px-3 py-1 bg-zinc-950 border-y border-r border-zinc-800 rounded-r-2xl font-mono">ОТЛИЧНО</div></div>
+<div><button onclick="applyKBCorrectionToLive()" class="px-4 py-2 flex items-center text-xs font-medium gap-1.5 text-amber-400 hover:text-amber-300 transition rounded-xl border border-zinc-800 hover:bg-zinc-800"><i class="fa-solid fa-magic"></i><span>Применить KB-коррекцию</span></button></div>
+</div></div></div>
+
+<!-- REPORT MODAL -->
+<div id="report-view" onclick="if(event.target.id==='report-view')hideReportView()" class="hidden fixed inset-0 bg-black/90 z-[70] flex items-center justify-center p-4">
+<div onclick="event.stopImmediatePropagation()" class="max-w-[1040px] w-full bg-zinc-900 border border-zinc-700 shadow-2xl rounded-3xl overflow-hidden max-h-[94vh] flex flex-col">
+<div class="px-6 py-4 flex items-center border-b border-zinc-700 bg-zinc-950"><div class="flex-1"><div id="report-title-header" class="font-semibold text-xl"></div><div id="report-meta-header" class="text-xs text-zinc-400"></div></div>
+<div class="flex items-center gap-x-2"><button onclick="downloadReportMD()" class="px-4 h-9 flex items-center gap-x-2 text-sm border border-zinc-600 hover:bg-zinc-800 rounded-2xl"><i class="fa-solid fa-download"></i><span class="hidden md:inline">.md</span></button><button onclick="copyReportToClipboard()" class="px-4 h-9 flex items-center gap-x-2 text-sm border border-zinc-600 hover:bg-zinc-800 rounded-2xl"><i class="fa-solid fa-copy"></i></button><button onclick="window.print()" class="px-4 h-9 flex items-center gap-x-2 text-sm border border-zinc-600 hover:bg-zinc-800 rounded-2xl"><i class="fa-solid fa-print"></i></button><button onclick="hideReportView()" class="px-4 h-9 flex items-center text-sm bg-zinc-800 hover:bg-zinc-700 rounded-2xl">Закрыть</button></div></div>
+<div class="overflow-auto flex-1 p-6 prose prose-invert prose-report text-sm leading-relaxed max-w-none" id="report-content"></div>
+<div class="border-t border-zinc-700 px-6 py-3 bg-zinc-950 flex items-center gap-4 text-xs"><div onclick="regenerateReport('heuristic')" class="cursor-pointer flex items-center gap-2 px-3 py-1 rounded-lg hover:bg-zinc-900 text-cyan-400"><i class="fa-solid fa-sync"></i> <span>Перегенерировать (эвристика)</span></div><div id="ollama-regen-btn" onclick="regenerateReport('ollama')" class="hidden cursor-pointer flex items-center gap-2 px-3 py-1 rounded-lg hover:bg-zinc-900 text-emerald-400"><i class="fa-solid fa-robot"></i> <span>Сгенерировать с ИИ (Ollama)</span></div><div class="flex-1"></div><div id="report-corrections-badge" class="stat-pill text-amber-400"></div></div></div></div>
+
+<!-- Modals: create, join, invite -->
+<div id="modal-create" onclick="hideCreateModal()" class="hidden fixed inset-0 bg-black/70 z-[80] flex items-center justify-center"><div onclick="event.stopImmediatePropagation()" class="modal bg-zinc-900 border border-zinc-700 w-full max-w-md rounded-3xl p-7">
+<div class="font-semibold text-2xl mb-1">Новая комната</div><div class="text-sm text-zinc-400 mb-6">Хост создаёт встречу и получает приглашение</div>
+<div class="space-y-4"><div><label class="block text-xs font-medium text-zinc-400 mb-1.5">ВАШЕ ИМЯ (ХОСТ)</label><input id="create-name" value="Анна Смирнова" class="w-full bg-zinc-950 border border-zinc-700 focus:border-cyan-400 rounded-2xl px-4 py-3 text-lg outline-none"></div>
+<div><label class="block text-xs font-medium text-zinc-400 mb-1.5">НАЗВАНИЕ ВСТРЕЧИ</label><input id="create-title" placeholder="Обсуждение пилота TwinForge" class="w-full bg-zinc-950 border border-zinc-700 focus:border-cyan-400 rounded-2xl px-4 py-3 outline-none"></div></div>
+<div class="mt-7 flex gap-x-3"><button onclick="hideCreateModal()" class="flex-1 py-3 rounded-2xl border border-zinc-700">Отмена</button><button onclick="createRoom()" class="flex-1 py-3 rounded-2xl bg-white text-zinc-950 font-semibold">Создать и получить ссылку</button></div></div></div>
+
+<div id="modal-join" onclick="hideJoinModal()" class="hidden fixed inset-0 bg-black/70 z-[80] flex items-center justify-center"><div onclick="event.stopImmediatePropagation()" class="modal bg-zinc-900 border border-zinc-700 w-full max-w-md rounded-3xl p-7">
+<div class="font-semibold text-2xl mb-5">Присоединиться к комнате</div>
+<div class="space-y-4"><div><label class="block text-xs font-medium text-zinc-400 mb-1.5">КОД КОМНАТЫ ИЛИ ССЫЛКА</label><input id="join-code" placeholder="AB12CD" class="w-full bg-zinc-950 border border-zinc-700 focus:border-cyan-400 rounded-2xl px-4 py-3 text-xl font-mono tracking-[3px] outline-none"></div>
+<div><label class="block text-xs font-medium text-zinc-400 mb-1.5">ВАШЕ ИМЯ</label><input id="join-name" value="Дмитрий Ковалёв" class="w-full bg-zinc-950 border border-zinc-700 focus:border-cyan-400 rounded-2xl px-4 py-3 text-lg outline-none"></div></div>
+<div class="mt-7 flex gap-x-3"><button onclick="hideJoinModal()" class="flex-1 py-3 rounded-2xl border border-zinc-700">Отмена</button><button onclick="joinRoomFromModal()" class="flex-1 py-3 rounded-2xl bg-white text-zinc-950 font-semibold">Войти в комнату</button></div></div></div>
+
+<div id="modal-invite" onclick="hideInviteModal()" class="hidden fixed inset-0 bg-black/70 z-[80] flex items-center justify-center"><div onclick="event.stopImmediatePropagation()" class="modal bg-zinc-900 border border-zinc-700 w-full max-w-md rounded-3xl p-7">
+<div class="font-semibold text-xl mb-4">Пригласить участников</div><div class="text-sm mb-3 text-zinc-400">Поделитесь ссылкой или кодом:</div>
+<div class="bg-zinc-950 rounded-2xl p-4 border border-zinc-800 mb-4"><div class="text-xs text-zinc-500 mb-1">ССЫЛКА ДЛЯ ПРИСОЕДИНЕНИЯ</div><div class="flex items-center gap-2"><div id="invite-link" class="font-mono text-sm flex-1 text-cyan-300 break-all"></div><button onclick="copyInviteLink(true)" class="px-3 py-1 bg-zinc-800 text-xs rounded-xl">Копировать</button></div></div>
+<div class="flex items-center gap-x-3"><div class="flex-1 bg-zinc-950 border border-zinc-700 rounded-2xl px-4 py-3 font-mono text-3xl text-center tracking-[6px]" id="invite-code"></div><button onclick="copyCode()" class="px-5 py-3 bg-zinc-800 rounded-2xl text-sm">Копировать код</button></div>
+<div class="mt-6 text-xs text-center text-zinc-400">Код действует до завершения встречи</div></div></div>
+
+<div id="toast-container" class="fixed bottom-5 right-5 z-[90] space-y-2"></div>
+
+<script>
+// ============== FULL VANILLA JS IMPLEMENTATION (ALL FEATURES) ==============
+let currentRoom=null, currentPeerId=null, localSpeakerName="Участник", isHost=false, ws=null, localStream=null, screenStream=null; // localSpeakerName fixes host STT attribution bug
+let peerConnections={}, remoteStreams={}, meetingTimerInterval=null, meetingStartTime=null;
+let liveTranscript=[], recognition=null, isRecognizing=false;
+let lastGeneratedReport=null;
+let audioRecorder=null, audioChunks=[], audioBlob=null; // MVP: reliable per-participant audio capture for reports + NIR research
+
+const STUN={iceServers:[{urls:"stun:stun.l.google.com:19302"}]};
+
+function showToast(m,t="success"){const c=document.getElementById("toast-container");const el=document.createElement("div");el.className=`px-5 py-3 shadow-xl text-sm border ${t==="error"?"bg-red-900 border-red-700":"bg-zinc-900 border-zinc-700"} rounded-2xl flex gap-3 items-center max-w-xs`;el.innerHTML=`<div class="flex-1">${m}</div><button onclick="this.parentNode.remove()" class="text-xs opacity-60">×</button>`;c.appendChild(el);setTimeout(()=>el.parentNode&&el.parentNode.removeChild(el),4800)}
+function formatTime(s){return `${Math.floor(s/60).toString().padStart(2,"0")}:${Math.floor(s%60).toString().padStart(2,"0")}`}
+function copyToClipboard(t,msg="Скопировано"){navigator.clipboard.writeText(t).then(()=>showToast(msg)).catch(()=>{const a=document.createElement("textarea");a.value=t;document.body.appendChild(a);a.select();document.execCommand("copy");document.body.removeChild(a);showToast(msg)})}
+
+function showCreateRoomModal(){document.getElementById("modal-create").classList.remove("hidden");document.getElementById("modal-create").classList.add("flex");setTimeout(()=>document.getElementById("create-name").focus(),120)}
+function hideCreateModal(){const m=document.getElementById("modal-create");m.classList.add("hidden");m.classList.remove("flex")}
+function showJoinModal(){document.getElementById("modal-join").classList.remove("hidden");document.getElementById("modal-join").classList.add("flex")}
+function hideJoinModal(){const m=document.getElementById("modal-join");m.classList.add("hidden");m.classList.remove("flex")}
+function showInviteModal(){if(!currentRoom)return;const code=currentRoom.code;const link=`${location.origin}/?join=${code}`;document.getElementById("invite-code").innerText=code;document.getElementById("invite-link").innerText=link;const m=document.getElementById("modal-invite");m.classList.remove("hidden");m.classList.add("flex")}
+function hideInviteModal(){const m=document.getElementById("modal-invite");m.classList.add("hidden");m.classList.remove("flex")}
+
+async function createRoom(){const name=document.getElementById("create-name").value.trim()||"Хост";const title=document.getElementById("create-title").value.trim()||null;hideCreateModal();try{const r=await fetch("/api/rooms",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({host_name:name,title})});const d=await r.json();await joinRoomInternal(d.code,name,true,d.room_id);setTimeout(showInviteModal,650)}catch(e){showToast("Ошибка создания: "+e.message,"error")}}
+async function joinRoomFromModal(){let code=document.getElementById("join-code").value.trim().toUpperCase().replace(/[^A-Z0-9]/g,"");const nm=document.getElementById("join-name").value.trim()||"Участник";if(!code)return showToast("Введите код","error");hideJoinModal();await joinRoomInternal(code,nm)}
+async function joinRoomInternal(code,name,forceHost=false,rid=null){try{const r=await fetch("/api/rooms/join",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code,name})});const d=await r.json();if(!d.success)throw new Error(d.error||"Ошибка");currentRoom={room_id:d.room_id,code:d.code||code,title:d.title,host_name:d.host_name};currentPeerId=d.peer_id;localSpeakerName=name;isHost=forceHost||(d.host_name===name);document.getElementById("landing-view").classList.add("hidden");document.getElementById("room-view").classList.remove("hidden");document.getElementById("room-view").classList.add("flex");document.getElementById("room-title").innerText=currentRoom.title;document.getElementById("room-code").innerText=currentRoom.code;connectWS(currentRoom.room_id,currentPeerId,name);await startLocalMedia();startTimer();renderParticipants(d.peers||[]);if(isHost)document.getElementById("host-controls").classList.remove("hidden");setTimeout(tryStartSTT,1100);showToast(`Вы вошли как ${name}`);const u=new URL(location);u.searchParams.set("join",currentRoom.code);history.replaceState({},"",u)}catch(e){showToast("Ошибка входа: "+e.message,"error");leaveRoom(true)}}
+function startTimer(st=Date.now()){meetingStartTime=st;if(meetingTimerInterval)clearInterval(meetingTimerInterval);meetingTimerInterval=setInterval(()=>{if(!meetingStartTime)return;const el=document.getElementById("meeting-timer");if(el)el.innerText=formatTime(Math.floor((Date.now()-meetingStartTime)/1000))},900)}
+function connectWS(rid,pid,name){const proto=location.protocol==="https:"?"wss:":"ws:";ws=new WebSocket(`${proto}//${location.host}/ws/${rid}/${pid}?name=${encodeURIComponent(name)}`);ws.onopen=()=>document.getElementById("conn-quality").innerHTML="<span class=\"text-emerald-400\">ПОДКЛЮЧЕНО</span>";ws.onmessage=async e=>{const m=JSON.parse(e.data);await handleWS(m)};ws.onclose=()=>{document.getElementById("conn-quality").innerHTML="ОТКЛЮЧЕНО";if(currentRoom)setTimeout(()=>connectWS(rid,pid,name),1700)}}
+function htmlEscape(str){return String(str).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]||m))}
+function cleanupPeer(pid){if(peerConnections[pid]){try{peerConnections[pid].close()}catch(e){}delete peerConnections[pid]}if(remoteStreams[pid])delete remoteStreams[pid];const t=document.getElementById("tile-"+pid);if(t)t.remove()}
+async function handleWS(m){const {type,data,from}=m;if(type==="peer-list"){renderParticipants(data.peers);data.peers.forEach(p=>{if(p.peer_id!==currentPeerId) updateTileName(p.peer_id, p.name); if(p.peer_id!==currentPeerId&&!peerConnections[p.peer_id]) createPC(p.peer_id,true)}); }else if(type==="peer-joined"){renderParticipants(data.peers);if(data.peer){ updateTileName(data.peer.peer_id, data.peer.name); if(data.peer.peer_id!==currentPeerId) createPC(data.peer.peer_id,true); }}else if(type==="peer-left"){cleanupPeer(data.peer_id);renderParticipants(data.peers||[])}else if(type==="offer"){const pc=await createPC(from,false);await pc.setRemoteDescription(new RTCSessionDescription(data.offer));const ans=await pc.createAnswer();await pc.setLocalDescription(ans);ws.send(JSON.stringify({type:"answer",to:from,data:{answer:ans}}))}else if(type==="answer"){const pc=peerConnections[from];if(pc)await pc.setRemoteDescription(new RTCSessionDescription(data.answer))}else if(type==="ice-candidate"){const pc=peerConnections[from];if(pc&&data.candidate)try{await pc.addIceCandidate(new RTCIceCandidate(data.candidate))}catch(e){}}else if(type==="transcript-segment"){addLiveTranscript(data.speaker,data.text,data.ts)}else if(type==="chat"){appendChat(data.from_name,data.text,data.from===currentPeerId)}else if(type==="media-state"){updatePeerMedia(data.peer_id,data);renderParticipants()}else if(type==="meeting-ended"){const rid=data.report_id|| (data.data&&data.data.report_id);showToast("Встреча завершена. Загружаем отчёт...");if(rid)await fetchReport(rid)}}
+async function createPC(rid,init){if(peerConnections[rid])return peerConnections[rid];const pc=new RTCPeerConnection(STUN);peerConnections[rid]=pc;if(localStream)localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));pc.ontrack=e=>{remoteStreams[rid]=e.streams[0];attachVideo(rid,e.streams[0])};pc.onicecandidate=e=>{if(e.candidate&&ws&&ws.readyState===1)ws.send(JSON.stringify({type:"ice-candidate",to:rid,data:{candidate:e.candidate}}))};if(init){const o=await pc.createOffer({offerToReceiveAudio:true,offerToReceiveVideo:true});await pc.setLocalDescription(o);ws.send(JSON.stringify({type:"offer",to:rid,data:{offer:o}}))}return pc}
+function attachVideo(pid,stream){let t=document.getElementById("tile-"+pid);if(!t)t=createTile(pid,"Участник");const v=t.querySelector("video");if(v){v.srcObject=stream;v.play().catch(()=>{})}} 
+function updateTileName(pid, name){ const el=document.getElementById("name-"+pid); if(el) el.textContent = name; }
+function createTile(pid,name,local=false){const g=document.getElementById("video-grid");let t=document.getElementById("tile-"+pid);if(t)return t;t=document.createElement("div");t.id="tile-"+pid;t.className=`video-tile aspect-video rounded-3xl overflow-hidden shadow-xl ${local?"ring-1 ring-offset-2 ring-offset-zinc-950 ring-cyan-400":""}`;const v=document.createElement("video");v.className="w-full h-full";v.autoplay=true;v.playsInline=true;if(local)v.muted=true;const lbl=document.createElement("div");lbl.className="participant-label absolute bottom-0 left-0 right-0 px-3 py-1.5 flex items-center justify-between text-xs";const left=document.createElement("div");left.className="flex items-center gap-x-2";const nmEl=document.createElement("span");nmEl.className="font-medium";nmEl.id="name-"+pid;nmEl.textContent=name;left.appendChild(nmEl);const ic=document.createElement("div");ic.id="media-icons-"+pid;ic.className="flex gap-1 text-[10px]";left.appendChild(ic);lbl.appendChild(left);if(local){const you=document.createElement("div");you.className="text-[9px] bg-cyan-400/90 text-black px-1 rounded";you.textContent="ВЫ";lbl.appendChild(you)}t.appendChild(v);t.appendChild(lbl);g.appendChild(t);if(local&&localStream){const vv=t.querySelector("video");vv.srcObject=localStream;vv.muted=true}return t}
+async function startLocalMedia(){try{localStream=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:640}},audio:{echoCancellation:true,noiseSuppression:true}});const tile=createTile(currentPeerId,"Вы (локально)",true);const v=tile.querySelector("video");v.srcObject=localStream;v.muted=true;
+// MVP audio recording (separate from video; uses only audio track for clean per-speaker capture)
+try {
+  const audioTrack = localStream.getAudioTracks()[0];
+  if (audioTrack) {
+    const audioStream = new MediaStream([audioTrack]);
+    audioRecorder = new MediaRecorder(audioStream, {mimeType: 'audio/webm'});
+    audioChunks = [];
+    audioRecorder.ondataavailable = e => { if (e.data && e.data.size > 0) audioChunks.push(e.data); };
+    audioRecorder.start();
+  }
+} catch(_) {}
+setTimeout(()=>{if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:"media-state",data:{peer_id:currentPeerId,mic:true,cam:true,screen:false}}))},600)}catch(e){showToast("Нет доступа к камере/микрофону (разрешения?)","error")}}
+function toggleMic(){if(!localStream)return;const t=localStream.getAudioTracks()[0];if(!t)return;t.enabled=!t.enabled;const ic=document.getElementById("mic-icon"),lb=document.getElementById("mic-label");if(t.enabled){ic.classList.remove("fa-microphone-slash","text-red-400");ic.classList.add("fa-microphone","text-emerald-400");lb.innerText="Микрофон"}else{ic.classList.add("fa-microphone-slash","text-red-400");ic.classList.remove("fa-microphone","text-emerald-400");lb.innerText="Выкл."}if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:"media-state",data:{peer_id:currentPeerId,mic:t.enabled}}))}
+function toggleCam(){if(!localStream)return;const t=localStream.getVideoTracks()[0];if(!t)return;t.enabled=!t.enabled;const ic=document.getElementById("cam-icon"),lb=document.getElementById("cam-label");if(t.enabled){ic.classList.remove("fa-video-slash","text-red-400");ic.classList.add("fa-video","text-emerald-400");lb.innerText="Камера"}else{ic.classList.add("fa-video-slash","text-red-400");ic.classList.remove("fa-video","text-emerald-400");lb.innerText="Выкл."}if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:"media-state",data:{peer_id:currentPeerId,cam:t.enabled}}))}
+async function toggleScreenShare(){const btn=document.getElementById("btn-screen"),lb=document.getElementById("screen-label");if(screenStream){screenStream.getTracks().forEach(x=>x.stop());screenStream=null;if(localStream){const vt=localStream.getVideoTracks()[0];Object.values(peerConnections).forEach(pc=>{const s=pc.getSenders().find(x=>x.track&&x.track.kind==="video");if(s&&vt)s.replaceTrack(vt)});const lv=document.querySelector("#video-grid video");if(lv)lv.srcObject=localStream}lb.innerText="Экран";btn.classList.remove("!bg-emerald-700","border-emerald-600");if(ws)ws.send(JSON.stringify({type:"media-state",data:{peer_id:currentPeerId,screen:false}}));return}try{screenStream=await navigator.mediaDevices.getDisplayMedia({video:{cursor:"always"},audio:false});const st=screenStream.getVideoTracks()[0];Object.values(peerConnections).forEach(pc=>{const s=pc.getSenders().find(x=>x.track&&x.track.kind==="video");if(s)s.replaceTrack(st)});const lv=document.querySelector("#video-grid video");if(lv)lv.srcObject=screenStream;lb.innerText="Остановить";btn.classList.add("!bg-emerald-700","border-emerald-600");st.onended=()=>toggleScreenShare();if(ws)ws.send(JSON.stringify({type:"media-state",data:{peer_id:currentPeerId,screen:true}}));showToast("Демонстрация экрана")}catch(e){showToast("Не удалось поделиться экраном","error")}}
+function updatePeerMedia(pid,st){const ic=document.getElementById("media-icons-"+pid);if(!ic)return;ic.innerHTML="";if(st.mic===false)ic.innerHTML+='<i class="fa-solid fa-microphone-slash text-red-400"></i>';if(st.cam===false)ic.innerHTML+='<i class="fa-solid fa-video-slash text-red-400"></i>';if(st.screen===true)ic.innerHTML+='<i class="fa-solid fa-desktop text-cyan-400"></i>'}
+function renderParticipants(peers){const c=document.getElementById("participants-list");c.innerHTML="";const pc=document.getElementById("participant-count");if(pc)pc.innerText=`${peers.length} участник${peers.length===1?"":"а"}`;peers.forEach(p=>{const d=document.createElement("div");d.className=`flex items-center justify-between px-3 py-[7px] rounded-2xl ${p.peer_id===currentPeerId?"bg-zinc-800":""}`;const left=document.createElement("div");left.className="flex items-center gap-x-3";const av=document.createElement("div");av.className="w-7 h-7 bg-zinc-700 rounded-full flex items-center justify-center text-xs font-semibold";av.textContent=(p.name||" ")[0];left.appendChild(av);const nmWrap=document.createElement("div");nmWrap.className="font-medium";nmWrap.appendChild(document.createTextNode(p.name||""));if(p.is_host){const h=document.createElement("span");h.className="text-[9px] text-amber-400";h.textContent=" (хост)";nmWrap.appendChild(h)}left.appendChild(nmWrap);d.appendChild(left);const right=document.createElement("div");right.className="flex items-center gap-1 text-sm";let ic="";if(!p.mic_enabled)ic+='<i class="fa-solid fa-microphone-slash text-red-400 ml-1"></i>';if(!p.cam_enabled)ic+='<i class="fa-solid fa-video-slash text-red-400 ml-1"></i>';if(p.screen_enabled)ic+='<i class="fa-solid fa-desktop text-cyan-400 ml-1"></i>';right.innerHTML=ic;if(p.peer_id===currentPeerId){const y=document.createElement("span");y.className="text-xs bg-zinc-700 px-1.5 rounded";y.textContent="Вы";right.appendChild(y)}d.appendChild(right);c.appendChild(d)})}
+function tryStartSTT(){const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){document.getElementById("stt-status").innerText="НЕ ПОДДЕРЖИВАЕТСЯ";return}recognition=new SR();recognition.continuous=true;recognition.interimResults=true;recognition.lang="ru-RU";recognition.onresult=e=>{let ft="";for(let i=e.resultIndex;i<e.results.length;i++){const rs=e.results[i];if(rs.isFinal){ft=rs[0].transcript.trim();if(ft.length>2&&currentRoom){const ts=(Date.now()-(meetingStartTime||Date.now()))/1000;addLiveTranscript(localSpeakerName||currentRoom.host_name||"Вы",ft,ts);if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:"transcript-segment",room_id:currentRoom.room_id,peer_id:currentPeerId,text:ft,ts:Math.max(0,ts),conf:rs[0].confidence||0.88}))}}else{const ie=document.getElementById("stt-interim");const ct=document.getElementById("live-transcript");if(!ie){const tmp=document.createElement("div");tmp.id="stt-interim";tmp.className="text-zinc-400 text-xs italic px-2 py-0.5";tmp.textContent=rs[0].transcript;ct.appendChild(tmp)}else ie.textContent=rs[0].transcript}}};recognition.onend=()=>{isRecognizing=false;document.getElementById("stt-status").innerText="ПРИОСТАНОВЛЕНО";if(currentRoom)setTimeout(()=>{if(currentRoom&&recognition){try{recognition.start();isRecognizing=true;document.getElementById("stt-status").innerHTML="<span class=\"text-emerald-400\">РАБОТАЕТ</span>"}catch(e){}}},650)};try{recognition.start();isRecognizing=true;document.getElementById("stt-status").innerHTML="<span class=\"text-emerald-400\">РАБОТАЕТ</span>";showToast("Живые субтитры ru-RU активны")}catch(e){}}
+function addLiveTranscript(spk,txt,ts=0){const ct=document.getElementById("live-transcript");const rel=ts||((Date.now()-(meetingStartTime||Date.now()))/1000);const d=document.createElement("div");d.className="transcript-line text-xs border-l-2 border-cyan-700 pl-2.5 py-0.5";const mm=new Date(rel*1000).toISOString().substr(11,8);const sp=document.createElement("span");sp.className="speaker-tag font-medium";sp.textContent=spk;const tm=document.createElement("span");tm.className="font-mono text-[9px] text-zinc-500";tm.textContent=mm;const h=document.createElement("div");h.className="flex items-baseline gap-x-2";h.appendChild(sp);h.appendChild(tm);const b=document.createElement("div");b.className="text-zinc-100 leading-snug mt-px";b.textContent=txt;d.appendChild(h);d.appendChild(b);ct.appendChild(d);ct.scrollTop=ct.scrollHeight;liveTranscript.push({ts:rel,speaker:spk,text:txt});if(ct.children.length>65)ct.removeChild(ct.children[0])}
+function clearLocalTranscript(){document.getElementById("live-transcript").innerHTML="";liveTranscript=[]}
+async function applyKBCorrectionToLive(){if(!liveTranscript.length)return showToast("Нет текста");const r=await fetch("/api/correct-transcript",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({segments:liveTranscript})});const d=await r.json();const ct=document.getElementById("live-transcript");ct.innerHTML="";d.corrected.forEach(s=>{const el=document.createElement("div");el.className="transcript-line text-xs border-l-2 border-amber-600 pl-2.5 py-0.5";const mm=new Date(s.ts*1000).toISOString().substr(11,8);const sp=document.createElement("span");sp.className="speaker-tag";sp.textContent=s.speaker;const tm=document.createElement("span");tm.className="font-mono text-[9px] text-zinc-500";tm.textContent=mm;const h=document.createElement("div");h.className="flex gap-x-2";h.appendChild(sp);h.appendChild(tm);const b=document.createElement("div");b.textContent=s.text;el.appendChild(h);el.appendChild(b);ct.appendChild(el)});showToast(`Применено ${d.meta.num_corrections} исправлений KB`)}
+function appendChat(nm,txt,mine){const c=document.getElementById("chat-messages");const d=document.createElement("div");d.className=`flex ${mine?"justify-end":""}`;const inner=document.createElement("div");inner.className=`max-w-[80%] px-3 py-1.5 rounded-2xl text-sm ${mine?"bg-cyan-700 text-white":"bg-zinc-800"}`;if(!mine){const nmEl=document.createElement("div");nmEl.className="text-[10px] text-zinc-400 mb-px";nmEl.textContent=nm;inner.appendChild(nmEl)}const txtEl=document.createElement("div");txtEl.textContent=txt;inner.appendChild(txtEl);d.appendChild(inner);c.appendChild(d);c.scrollTop=c.scrollHeight}
+function sendChatMessage(){const i=document.getElementById("chat-input");const t=i.value.trim();if(!t||!ws||ws.readyState!==1)return;ws.send(JSON.stringify({type:"chat",data:{text:t}}));appendChat("Вы",t,true);i.value=""}
+async function endMeeting(){if(!currentRoom||!isHost)return;if(!confirm("Завершить встречу и сгенерировать отчёт?"))return;if(recognition)try{recognition.stop()}catch(e){}
+// Stop audio recorder cleanly (MVP)
+const finish = () => { if (isHost) reviewTranscriptBeforeUpload(); else uploadArtifacts(); };
+if (audioRecorder && audioRecorder.state !== "inactive") {
+  try { audioRecorder.onstop = async () => { await finalizeAndUploadAudio(); finish(); }; audioRecorder.stop(); } catch(_) { finish(); }
+} else { finish(); }
+if(ws)ws.send(JSON.stringify({type:"end-meeting",room_id:currentRoom.room_id}));}
+async function finalizeAndUploadAudio() {
+  if (audioChunks && audioChunks.length > 0) {
+    audioBlob = new Blob(audioChunks, {type: 'audio/webm'});
+    audioChunks = [];
+  }
+  await uploadArtifacts();
+}
+
+async function uploadArtifacts(editedTranscript=null) {
+  try {
+    const base = liveTranscript.length ? liveTranscript : [{ts:12,speaker:localSpeakerName||"Вы",text:"Тест цифровой двойник и предиктивное обслуживание."}];
+    const ft = editedTranscript || base;
+    const fd = new FormData();
+    fd.append("room_id", currentRoom.room_id);
+    fd.append("peer_id", currentPeerId);
+    fd.append("transcript", JSON.stringify(ft));
+    if (audioBlob && audioBlob.size > 2000) {
+      fd.append("audio", audioBlob, `rec-${currentPeerId}.webm`);
+    }
+    const resp = await fetch("/api/meetings/upload-artifacts", {method:"POST", body:fd});
+    const j = await resp.json().catch(()=>({}));
+    if (j.report_id) {
+      lastGeneratedReport = {id: j.report_id};
+      await fetchReport(j.report_id);
+    }
+  } catch(e) { console.warn(e); showToast("Не удалось сохранить артефакты, но отчёт может быть доступен в истории","error"); }
+}
+
+// MVP: lightweight transcript review for host before final report (simple but very useful for NIR accuracy)
+function reviewTranscriptBeforeUpload() {
+  if (!isHost || !liveTranscript.length) return uploadArtifacts();
+  const joined = liveTranscript.map(s => `[${Math.floor(s.ts/60)}:${String(Math.floor(s.ts%60)).padStart(2,'0')}] ${s.speaker}: ${s.text}`).join('\n');
+  const modal = document.createElement('div');
+  modal.className = 'fixed inset-0 bg-black/80 z-[95] flex items-center justify-center p-4';
+  modal.innerHTML = `
+    <div class="bg-zinc-900 border border-zinc-700 rounded-3xl w-full max-w-3xl p-6">
+      <div class="font-semibold text-xl mb-2">Проверка транскрипта перед отчётом</div>
+      <div class="text-xs text-zinc-400 mb-3">Можно быстро поправить ошибки STT. Это улучшит качество отчёта и метрики для НИР.</div>
+      <textarea id="review-ta" class="w-full h-72 font-mono text-sm bg-zinc-950 border border-zinc-800 rounded-2xl p-4" style="white-space:pre">${joined}</textarea>
+      <div class="mt-4 flex gap-3 justify-end text-sm">
+        <button id="rev-cancel" class="px-5 py-2 rounded-2xl border border-zinc-700">Отмена</button>
+        <button id="rev-use" class="px-6 py-2 rounded-2xl bg-white text-zinc-950 font-semibold">Использовать как есть</button>
+        <button id="rev-save" class="px-6 py-2 rounded-2xl bg-emerald-600 text-white font-semibold">Сохранить правки и завершить</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  const ta = modal.querySelector('#review-ta');
+  modal.querySelector('#rev-cancel').onclick = () => { modal.remove(); uploadArtifacts(); };
+  modal.querySelector('#rev-use').onclick = () => { modal.remove(); uploadArtifacts(); };
+  modal.querySelector('#rev-save').onclick = () => {
+    const edited = [];
+    const lines = ta.value.split('\n').filter(Boolean);
+    lines.forEach((ln, idx) => {
+      const m = ln.match(/\[(\d+):(\d+)\]\s*(.+?):\s*(.+)/);
+      if (m) edited.push({ts: (+m[1])*60 + (+m[2]), speaker: m[3].trim(), text: m[4].trim()});
+      else edited.push({ts: 30+idx*10, speaker: localSpeakerName, text: ln.trim()});
+    });
+    modal.remove();
+    uploadArtifacts(edited.length ? edited : null);
+  };
+}
+async function fetchReport(rid){try{const r=await fetch(`/api/reports/${rid}`);const rep=await r.json();lastGeneratedReport=rep;showReport(rep);leaveRoom(true,true)}catch(e){showToast("Ошибка загрузки отчёта","error");leaveRoom(true)}}
+function showReport(rep){document.getElementById("report-view").classList.remove("hidden");document.getElementById("report-view").classList.add("flex");document.getElementById("report-title-header").innerText=rep.title||"Отчёт";document.getElementById("report-meta-header").innerHTML=`${rep.meta?.duration_min||"?"} мин • ${rep.meta?.participants?.length||0} чел`;const c=document.getElementById("report-content");c.innerHTML=window.marked?window.marked.parse(rep.markdown):`<pre>${rep.markdown}</pre>`;document.getElementById("report-corrections-badge").innerHTML=`${rep.meta?.num_corrections||0} исправлений KB`;fetch("/api/ollama-status").then(r=>r.json()).then(d=>{if(d.available)document.getElementById("ollama-regen-btn").classList.remove("hidden")}).catch(()=>{});lastGeneratedReport=rep}
+function hideReportView(){const rv=document.getElementById("report-view");rv.classList.add("hidden");rv.classList.remove("flex")}
+async function regenerateReport(mode){if(!lastGeneratedReport)return;const body={raw_transcript:lastGeneratedReport.raw_transcript||[],title:lastGeneratedReport.title,participants:lastGeneratedReport.meta?.participants||[],duration_sec:(lastGeneratedReport.meta?.duration_min||15)*60,mode};const r=await fetch("/api/reports/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});const f=await r.json();lastGeneratedReport=f;document.getElementById("report-content").innerHTML=window.marked?window.marked.parse(f.markdown):f.markdown;showToast("Отчёт перегенерирован")}
+function downloadReportMD(){if(!lastGeneratedReport)return;const b=new Blob([lastGeneratedReport.markdown],{type:"text/markdown"});const u=URL.createObjectURL(b);const a=document.createElement("a");a.href=u;a.download=`otchet-${(lastGeneratedReport.title||"vstrecha").replace(/\s/g,"-")}.md`;a.click();URL.revokeObjectURL(u)}
+function copyReportToClipboard(){if(!lastGeneratedReport)return;copyToClipboard(lastGeneratedReport.markdown,"Отчёт скопирован")}
+async function showReportsView(){document.getElementById("landing-view").classList.add("hidden");document.getElementById("room-view").classList.add("hidden");const ov=document.createElement("div");ov.id="reports-overlay";ov.className="fixed inset-0 bg-zinc-950 z-[60] overflow-auto";ov.innerHTML=`<div class="max-w-screen-xl mx-auto px-6 py-8"><div class="flex justify-between items-end mb-8"><div><div class="font-semibold tracking-tighter text-4xl">Мои отчёты</div><div class="text-zinc-400">История встреч</div></div><button onclick="document.getElementById('reports-overlay').remove();document.getElementById('landing-view').classList.remove('hidden')" class="px-5 py-2 rounded-2xl border border-zinc-700 text-sm">На главную</button></div><div id="rl" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div></div>`;document.body.appendChild(ov);const lc=document.getElementById("rl");try{const rs=await (await fetch("/api/reports")).json();if(!rs.length){lc.innerHTML=`<div class="col-span-full py-12 text-center text-zinc-400">Пока нет завершённых встреч.</div>`;return}rs.forEach(r=>{const cd=document.createElement("div");cd.className="meeting-card bg-zinc-900 border border-zinc-800 rounded-3xl p-5 cursor-pointer";cd.onclick=()=>openHistoryReport(r.id,ov);const ds=new Date(r.created_at*1000).toLocaleDateString("ru-RU");cd.innerHTML=`<div class="font-semibold">${r.title}</div><div class="text-xs text-zinc-400 mt-1">${ds} • ${r.duration_min} мин • ${r.num_participants} чел.</div><div class="flex mt-4 text-xs items-center gap-2"><div class="stat-pill">${r.num_corrections} исправл.</div><div class="text-emerald-400 text-[10px]">ОТКРЫТЬ →</div></div>`;lc.appendChild(cd)})}catch(e){lc.innerHTML=`<div class="text-red-400">Ошибка загрузки</div>`}}
+async function openHistoryReport(id,ov){ov.remove();const r=await (await fetch(`/api/reports/${id}`)).json();lastGeneratedReport=r;showReport(r)}
+function createDemoRoom(){fetch("/api/rooms",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({host_name:"Анна Смирнова",title:"Демо: Внедрение цифрового двойника"})}).then(r=>r.json()).then(async d=>{await joinRoomInternal(d.code,"Анна Смирнова",true,d.room_id);setTimeout(()=>{if(!currentRoom)return;const demo=[{ts:28,speaker:"Анна Смирнова",text:"Добрый день. Сегодня обсудим развёртывание цифровой двойник на линии термообработки."},{ts:71,speaker:"Дмитрий Ковалёв",text:"У нас уже есть данные с NT-Edge v3. Предиктивное обслуживание показывает хорошие результаты."},{ts:134,speaker:"Иван Петров",text:"Нужно подготовить ТЗ на интеграцию TwinForge к 15.06. Ответственный — я."},{ts:189,speaker:"Анна Смирнова",text:"Отлично. Также рассмотрим вибрационный анализ и аномалии в спектре с time-series transformer."},{ts:247,speaker:"Дмитрий Ковалёв",text:"Согласен. Запускаем пилот edge inference на нейроморфном процессоре."}];demo.forEach((s,i)=>setTimeout(()=>{if(!currentRoom)return;addLiveTranscript(s.speaker,s.text,s.ts);if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:"transcript-segment",room_id:currentRoom.room_id,peer_id:currentPeerId,text:s.text,ts:s.ts,conf:0.93}))},i*380));showToast("Демо-транскрипт загружена. Завершите встречу для отчёта.")},1300)})}
+function copyInviteLink(close=false){const code=currentRoom.code;const link=`${location.origin}/?join=${code}`;copyToClipboard(link,"Ссылка скопирована");if(close)hideInviteModal()}
+function copyCode(){if(currentRoom)copyToClipboard(currentRoom.code,"Код скопирован")}
+function showResearchModal(){const html=`<div onclick="this.remove()" class="fixed inset-0 bg-black/70 flex items-center justify-center z-[85]"><div onclick="event.stopImmediatePropagation()" class="modal bg-zinc-900 border border-zinc-700 w-full max-w-2xl rounded-3xl p-7"><div class="flex justify-between"><div><div class="font-semibold text-xl">Демонстрация RAG-коррекции KB</div><div class="text-xs text-amber-400">Для оценки гипотезы НИР</div></div><button onclick="event.target.closest('.fixed').remove()" class="text-xl leading-none px-2">×</button></div><div class="mt-5 text-sm">Введите зашумлённый транскрипт. Нажмите «Исправить».</div><textarea id="research-input" class="mt-3 w-full h-28 font-mono bg-zinc-950 border border-zinc-800 rounded-2xl p-3 text-sm" placeholder="Мы рассмотрели цифровой двойнк ... предиктивное обслуживанье ... Twin Forge ..."></textarea><div class="mt-3 flex gap-2"><button onclick="runKBResearch()" class="px-5 py-2 bg-amber-500 text-black rounded-2xl text-sm font-medium">Исправить с помощью KB + RAG</button><button onclick="document.getElementById('research-input').value='Мы развернули цифровой двойнк участка. Предиктивное обслуживанье на NT Edge v3 показало аномалию в спектре. Запускаем time series transformer и Twin Forge пилот.'" class="px-4 py-2 border border-zinc-600 rounded-2xl text-sm">Загрузить примеры из спецификации</button></div><div id="research-output" class="mt-4 bg-black rounded-2xl p-4 font-mono text-xs min-h-[110px] whitespace-pre-wrap hidden border border-zinc-800"></div></div></div>`;document.body.insertAdjacentHTML("beforeend",html)}
+async function runKBResearch(){const inp=document.getElementById("research-input").value.trim();if(!inp)return;const out=document.getElementById("research-output");out.classList.remove("hidden");out.innerHTML="Обработка...";const r=await fetch("/api/correct-transcript",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({segments:[{ts:10,speaker:"Тест",text:inp}]})});const d=await r.json();const before=inp, after=d.corrected[0].text; 
+// MVP research: simple proxy for WER improvement (word overlap)
+const bw=before.toLowerCase().split(/\s+/), aw=after.toLowerCase().split(/\s+/);
+const common = bw.filter(w=>aw.includes(w)).length;
+const proxy = bw.length? Math.round(100*(bw.length-common)/bw.length) : 0;
+out.innerHTML=`<div class="text-amber-400 mb-1">ДО (${d.meta.num_corrections} исправлений KB, ~${proxy}% "ошибок" по пересечению слов):</div><div class="text-zinc-400 line-through mb-3">${before}</div><div class="text-emerald-400 mb-1">ПОСЛЕ (улучшено RAG + алиасами):</div><div class="text-emerald-300">${after}</div><div class="text-[10px] text-zinc-500 mt-2">* Прокси метрика для быстрой оценки гипотезы НИР (реальный WER требует ground-truth аудио)</div>`}
+function leaveRoom(silent=false,keep=false){if(recognition)try{recognition.stop()}catch(e){}if(meetingTimerInterval)clearInterval(meetingTimerInterval);Object.values(peerConnections).forEach(pc=>pc.close());peerConnections={};remoteStreams={};if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null}if(screenStream){screenStream.getTracks().forEach(t=>t.stop());screenStream=null}if(ws){ws.close();ws=null}document.getElementById("room-view").classList.add("hidden");document.getElementById("room-view").classList.remove("flex");document.getElementById("video-grid").innerHTML="";document.getElementById("live-transcript").innerHTML="";currentRoom=null;currentPeerId=null;liveTranscript=[];if(!keep)document.getElementById("landing-view").classList.remove("hidden");if(!silent)showToast("Вы покинули комнату");history.replaceState({},"","/")}
+function switchSidebarTab(tab){["participants","transcript","chat"].forEach(t=>{document.getElementById("sidebar-"+t).classList.add("hidden");const te=document.getElementById("tab-"+t);te.classList.remove("nav-active");te.classList.add("text-zinc-400")});document.getElementById("sidebar-"+tab).classList.remove("hidden");const te=document.getElementById("tab-"+tab);te.classList.add("nav-active");te.classList.remove("text-zinc-400")}
+function initialize(){document.documentElement.style.setProperty("--accent","#22d3ee");const p=new URLSearchParams(location.search);if(p.has("join")){setTimeout(()=>{document.getElementById("join-code").value=p.get("join");showJoinModal()},380)}document.addEventListener("keydown",e=>{if(e.key==="/"&&document.activeElement.tagName==="BODY"){e.preventDefault();const rv=!document.getElementById("room-view").classList.contains("hidden");if(rv)switchSidebarTab("transcript");else showJoinModal()}if(e.key.toLowerCase()==="m"&&!document.getElementById("room-view").classList.contains("hidden")){e.preventDefault();toggleMic()}});window.PyIntelMeet={leaveRoom,showResearchModal,createDemoRoom};console.log("%c[PyIntelMeet] Полностью готов (WebRTC + STT + KB + Отчёты).","color:#3f3f46")} 
+window.onload=initialize;window.marked={parse:md=>md.replace(/^### (.*$)/gim,'<h3 class="font-semibold mt-4 mb-1">$1</h3>').replace(/^## (.*$)/gim,'<h2 class="font-semibold mt-5 mb-2 text-lg">$1</h2>').replace(/^# (.*$)/gim,'<h1 class="font-semibold text-2xl tracking-tight mb-3">$1</h1>').replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>").replace(/^- (.+)$/gim,'<li class="ml-4">$1</li>').replace(/\n/g,"<br>")};
+</script></body></html>

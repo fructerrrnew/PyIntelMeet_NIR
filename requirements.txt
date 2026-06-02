@@ -1,0 +1,26 @@
+# PyIntelMeet MVP v1.0 — минимальный набор для полностью рабочего прототипа
+# Установка: pip install -r requirements.txt
+# Для Windows: сначала .\setup.ps1 (создаст .venv) или используйте START.bat после установки.
+
+fastapi>=0.109
+uvicorn[standard]>=0.27
+websockets>=12.0
+sqlalchemy>=2.0
+pydantic>=2.5
+python-multipart>=0.0.6   # REQUIRED for file uploads in FastAPI (recording + artifacts)
+
+# AI / KB (обязательны для полной функциональности RAG-коррекции)
+chromadb>=0.4.22
+sentence-transformers>=2.3.1
+
+# Опционально (для улучшенных отчётов с LLM)
+httpx>=0.26   # используется для обнаружения и вызова Ollama
+
+# Для production STT (будущие расширения, закомментировано)
+# faster-whisper>=1.0
+# torch
+# soundfile
+# numpy
+
+# Примечание: на Windows для sentence-transformers может потребоваться Microsoft C++ Build Tools
+# Если нет chromadb/sentence-transformers — система автоматически переходит на режим только точных алиасов (всё ещё работает отлично)
