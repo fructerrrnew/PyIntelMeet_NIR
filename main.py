@@ -1,15 +1,3 @@
-#!/usr/bin/env python3
-"""
-PyIntelMeet — Полноценный монолитный прототип интеллектуальной системы видеоконференций.
-Полностью рабочий: FastAPI + WebSocket signaling + browser-native P2P WebRTC mesh + 
-Browser SpeechRecognition (ru-RU live captions) + ChromaDB + sentence-transformers RAG KB корректор +
-Чисто-Python эвристический генератор отчётов + опциональный Ollama.
-Всё в одном файле + гигантская self-contained INDEX_HTML (Tailwind CDN + Vanilla JS).
-
-Запуск: python main.py
-Зависимости: см. requirements.txt
-"""
-
 import asyncio
 import json
 import logging
@@ -52,7 +40,6 @@ try:
 except Exception:
     HAS_HTTPX = False
 
-# ==================== LOGGING & PATHS ====================
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger("pyintelmeet")
 
@@ -64,7 +51,6 @@ os.makedirs(os.path.join(DATA_DIR, "recordings"), exist_ok=True)
 DB_PATH = os.path.join(DATA_DIR, "pyintelmeet.db")
 CHROMA_PATH = os.path.join(DATA_DIR, "chroma")
 
-# ==================== DB SETUP (SQLAlchemy + raw sqlite for simplicity) ====================
 engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -89,13 +75,12 @@ def init_db():
         conn.commit()
     logger.info("SQLite DB initialized at %s", DB_PATH)
 
-# ==================== KNOWLEDGE BASE (EXACTLY FROM REQUIREMENTS) ====================
 NEUROTEK_KB = [
     {"term": "цифровой двойник", "aliases": ["digital twin", "DT", "виртуальный двойник", "цифровой двойнк"],
      "definition": "Виртуальная динамическая модель физического актива (станка, линии, цеха), синхронизированная с данными в реальном времени для симуляции, прогнозирования и оптимизации.",
      "common_stt_errors": ["цифровой двойнк", "цифровый двойник", "digital twing", "цифровой двой"], "category": "core_technology"},
     {"term": "предиктивное обслуживание", "aliases": ["predictive maintenance", "PdM", "предиктивное обслуживанье"],
-     "definition": "Методика прогнозирования отказов оборудования на основе анализа данных датчиков и ML-моделей для планирования ТО заранее.",
+     "definition": "Методика прогнозирования отказов оборудования на основе анализа данных датчиков и ML-моделями для планирования ТО заранее.",
      "common_stt_errors": ["предиктивное обслуживанье", "предиктивное обслуживание"], "category": "maintenance"},
     {"term": "edge inference", "aliases": ["инференс на краю", "edge AI", "эдж инференс"],
      "definition": "Выполнение моделей машинного обучения непосредственно на промышленных контроллерах и edge-устройствах.",
@@ -131,7 +116,6 @@ def get_kb_index():
 
 KB_INDEX = get_kb_index()
 
-# ==================== GLOBAL STATE ====================
 class Peer:
     def __init__(self, peer_id: str, name: str, is_host: bool = False):
         self.peer_id = peer_id
@@ -167,7 +151,6 @@ class Room:
         self.transcript.append(seg)
         self.last_activity = time.time()
 
-# In-memory room manager (robust, production-grade for prototype)
 class RoomManager:
     def __init__(self):
         self.rooms: Dict[str, Room] = {}
@@ -206,6 +189,10 @@ class RoomManager:
             peer = Peer(peer_id, name)
             room.peers[peer_id] = peer
             self.peer_to_room[peer_id] = room_id
+            # If the joining user has the same display name as the room host (common for creator after /create),
+            # promote this peer to host so that end-meeting works on the peer the client actually uses.
+            if name == room.host_name:
+                peer.is_host = True
             return {
                 "room_id": room_id, "peer_id": peer_id, "code": code,
                 "title": room.title, "host_name": room.host_name,
@@ -266,7 +253,6 @@ class RoomManager:
 
 room_manager = RoomManager()
 
-# ==================== CHROMA KB + RAG ====================
 _chroma_client = None
 _kb_collection = None
 _embedding_model = None
@@ -318,13 +304,13 @@ def correct_transcript(segments: List[dict], use_rag: bool = True) -> Tuple[List
     for seg in segments:
         original = seg.get("text", "")
         text = original
-        # Exact alias / error fixes
+    
         for entry in NEUROTEK_KB:
             for bad in entry.get("common_stt_errors", []) + entry.get("aliases", []):
                 if bad.lower() in text.lower():
                     text = re.sub(re.escape(bad), entry["term"], text, flags=re.IGNORECASE)
                     corrections += 1
-        # Fuzzy difflib
+  
         for entry in NEUROTEK_KB:
             for cand in [entry["term"]] + entry.get("aliases", []):
                 ratio = SequenceMatcher(None, text.lower(), cand.lower()).ratio()
@@ -334,14 +320,13 @@ def correct_transcript(segments: List[dict], use_rag: bool = True) -> Tuple[List
         if use_rag and len(text) > 10:
             for hit in retrieve_kb(text, 2):
                 if hit["term"].lower() not in text.lower():
-                    pass  # conservative: don't auto inject
+                    pass  
         corrected.append({**seg, "text": text, "corrected": text != original})
         if text != original:
             examples.append({"before": original[:90], "after": text[:90]})
     meta = {"num_corrections": corrections, "examples": examples[:4]}
     return corrected, meta
 
-# ==================== HEURISTIC REPORT GENERATOR (ALWAYS WORKS) + OLLAMA ====================
 def generate_heuristic_report(title: str, host: str, participants: List[str], duration_sec: float,
                                raw_trans: List[dict], corrected_trans: List[dict], corr_meta: dict) -> dict:
     timeline = []
@@ -350,28 +335,36 @@ def generate_heuristic_report(title: str, host: str, participants: List[str], du
         mmss = f"{ts//3600:02d}:{(ts%3600)//60:02d}:{ts%60:02d}"
         timeline.append(f"[{mmss}] {s.get('speaker')}: {s.get('text')}")
 
-    texts = [s["text"] for s in corrected_trans if len(s.get("text", "")) > 6]
-    summary = (texts[0] + " " + (texts[len(texts)//2] if len(texts) > 3 else "") + " " + (texts[-1] if texts else ""))[:620]
+    texts = [s.get("text", "") for s in corrected_trans if len(s.get("text", "")) > 6]
+    if texts:
+        mid = texts[len(texts)//2] if len(texts) > 3 else ""
+        summary = (texts[0] + " " + mid + " " + texts[-1])[:620]
+    else:
+        summary = "Совещание завершено. Детальная транскрипция отсутствует (нет распознанных сегментов речи)."
 
     decisions = []
     for s in corrected_trans:
-        if any(k in s["text"].lower() for k in ["решили", "договорились", "утвердили", "планируем", "запускаем"]):
-            decisions.append(f"{s['speaker']}: {s['text'][:120]}")
+        txt = s.get("text", "")
+        spk = s.get("speaker", "Участник")
+        if any(k in txt.lower() for k in ["решили", "договорились", "утвердили", "планируем", "запускаем"]):
+            decisions.append(f"{spk}: {txt[:120]}")
     if not decisions:
         decisions = ["Обсуждены вопросы внедрения ключевых технологий НейроТек."]
 
     action_items = []
     for s in corrected_trans:
-        if re.search(r"(нужно|сделаем|подготовить|ответственный|к \d{1,2}\.\d{1,2}|до \d{1,2}\.\d{1,2})", s["text"], re.I):
-            owner = s["speaker"]
-            m = re.search(r"([А-ЯЁ][а-яё]+(?:\s+[А-ЯЁ][а-яё]+)?)", s["text"])
+        txt = s.get("text", "")
+        spk = s.get("speaker", "Участник")
+        if re.search(r"(нужно|сделаем|подготовить|ответственный|к \d{1,2}\.\d{1,2}|до \d{1,2}\.\d{1,2})", txt, re.I):
+            owner = spk
+            m = re.search(r"([А-ЯЁ][а-яё]+(?:\s+[А-ЯЁ][а-яё]+)?)", txt)
             if m: owner = m.group(1)
-            action_items.append({"owner": owner, "task": s["text"][:135], "due": "по плану"})
+            action_items.append({"owner": owner, "task": txt[:135], "due": "по плану"})
     if not action_items:
         action_items = [{"owner": host, "task": "Подготовить ТЗ на интеграцию TwinForge", "due": "до 15.06.2026"}]
 
     mentioned = []
-    full = " ".join(t["text"].lower() for t in corrected_trans)
+    full = " ".join((t.get("text", "") or "").lower() for t in corrected_trans)
     for e in NEUROTEK_KB:
         if e["term"].lower() in full or any(a.lower() in full for a in e.get("aliases", [])):
             mentioned.append({"term": e["term"], "definition": e["definition"][:170]})
@@ -446,14 +439,11 @@ KB контекст: {kb_ctx[:1400]}
         logger.warning("Ollama failed: %s", ex)
         return None
 
-# ==================== FASTAPI APP ====================
 app = FastAPI(title="PyIntelMeet", version="1.0.0-MVP")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-# Serve extracted frontend (MVP: editable static/index.html instead of giant inline string)
 app.mount("/static", StaticFiles(directory="static", html=False), name="static")
 
-# WebSocket connections
 active_connections: Dict[str, List[WebSocket]] = {}  # room_id -> list of WS
 
 async def broadcast(room_id: str, message: dict, exclude: WebSocket = None):
@@ -476,7 +466,6 @@ async def ws_endpoint(websocket: WebSocket, room_id: str, peer_id: str, name: st
     active_connections[room_id].append(websocket)
 
     room = room_manager.get_room(room_id)
-    # SECURITY: Validate peer membership (prevents injection by rogue WS to known room_id)
     if not room or peer_id not in room.peers:
         await websocket.close()
         if room_id in active_connections and websocket in active_connections[room_id]:
@@ -524,8 +513,7 @@ async def ws_endpoint(websocket: WebSocket, room_id: str, peer_id: str, name: st
             elif mtype == "end-meeting":
                 ended_room = room_manager.end_room(room_id, peer_id)
                 if ended_room:
-                    # CRITICAL FIX: Server authoritative report generation + persist on end (using accumulated Room.transcript)
-                    # This guarantees report opens for ALL clients reliably in 3-8s, independent of client upload timing
+
                     try:
                         raw_segs = [{"ts": s.ts, "speaker": s.speaker, "text": s.text, "conf": s.conf} for s in ended_room.transcript]
                         corrected, corr_meta = correct_transcript(raw_segs)
@@ -533,7 +521,7 @@ async def ws_endpoint(websocket: WebSocket, room_id: str, peer_id: str, name: st
                         parts = [p.name for p in ended_room.peers.values()] or [host_name]
                         dur = (ended_room.ended_at or time.time()) - ended_room.started_at
                         report = generate_heuristic_report(ended_room.title, host_name, parts, dur, raw_segs, corrected, corr_meta)
-                        # Persist immediately
+                        
                         mid = room_id
                         with engine.connect() as conn:
                             conn.execute(text("""
@@ -558,7 +546,7 @@ async def ws_endpoint(websocket: WebSocket, room_id: str, peer_id: str, name: st
         if room_id in active_connections and websocket in active_connections[room_id]:
             active_connections[room_id].remove(websocket)
         room_manager.remove_peer(peer_id)
-        # Broadcast leave for mesh robustness
+       
         if room_id in active_connections:
             remaining_peers = []
             r = room_manager.get_room(room_id)
@@ -566,14 +554,20 @@ async def ws_endpoint(websocket: WebSocket, room_id: str, peer_id: str, name: st
                 remaining_peers = [{"peer_id": p.peer_id, "name": p.name, "is_host": p.is_host} for p in r.peers.values()]
             await broadcast(room_id, {"type": "peer-left", "data": {"peer_id": peer_id, "peers": remaining_peers}})
 
-# ==================== REST API ====================
 @app.post("/api/rooms")
 async def create_room(req: Request):
     body = await req.json()
     host = body.get("host_name", "Хост")
     title = body.get("title")
     room, peer_id = room_manager.create_room(host, title)
-    return {"success": True, "code": room.code, "room_id": room.room_id, "peer_id": peer_id}
+    return {
+        "success": True,
+        "code": room.code,
+        "room_id": room.room_id,
+        "peer_id": peer_id,
+        "title": room.title,
+        "host_name": room.host_name
+    }
 
 @app.post("/api/rooms/join")
 async def join_room(req: Request):
@@ -596,7 +590,6 @@ async def correct_endpoint(req: Request):
     corrected, meta = correct_transcript(segs, use_rag)
     return {"corrected": corrected, "meta": meta}
 
-# Guarded upload route — works even if python-multipart not installed at import time
 try:
     from fastapi import Form, File, UploadFile
     @app.post("/api/meetings/upload-artifacts")
@@ -608,7 +601,6 @@ try:
             trans = []
         corrected, corr_meta = correct_transcript(trans)
 
-        # MVP: persist per-participant audio recording for research / future server STT
         audio_path = None
         if audio is not None:
             rec_dir = os.path.join(DATA_DIR, "recordings")
@@ -632,7 +624,6 @@ try:
             dur, trans, corrected, corr_meta
         )
 
-        # Enrich meta with recording info (visible in reports for NIR)
         meta = report["meta"]
         if audio_path:
             meta["audio_recording"] = os.path.relpath(audio_path, BASE_DIR)
@@ -665,7 +656,7 @@ except Exception as _multipart_err:
     logger.warning("python-multipart not installed — upload endpoint disabled. Install it for full recording support: pip install python-multipart")
     @app.post("/api/meetings/upload-artifacts")
     async def upload_artifacts_fallback(request: Request):
-        # Fallback that still works for pure transcript-based reports
+        
         body = await request.json()
         room_id = body.get("room_id")
         trans = body.get("transcript", [])
@@ -681,9 +672,28 @@ except Exception as _multipart_err:
             corr_meta
         )
         mid = room_id or str(uuid.uuid4())
+        code = (room.code if room else "")
+        created = (room.created_at if room else time.time())
+        ended = (room.ended_at or time.time()) if room else time.time()
+        dur = (room.ended_at or time.time()) - (getattr(room, "started_at", None) or created) if room else 900.0
+        parts_list = [p.name for p in (room.peers.values() if room else [])] or ["Участник"]
+        hostn = (room.host_name if room else "Хост")
+        ttl = (room.title if room else report["title"])
+        rawj = json.dumps(trans if isinstance(trans, list) else [])
+        corrj = json.dumps(corrected)
+        met = dict(report["meta"])
+        met["num_corrections"] = corr_meta.get("num_corrections", 0)
         with engine.connect() as conn:
-            conn.execute(text("INSERT OR REPLACE INTO meetings (id, title, report_md, meta_json) VALUES (:id, :t, :md, :meta)"),
-                         {"id": mid, "t": report["title"], "md": report["markdown"], "meta": json.dumps(report["meta"])})
+            conn.execute(text("""
+                INSERT OR REPLACE INTO meetings (id, room_code, title, host_name, created_at, ended_at, duration_sec,
+                    participants_json, raw_transcript_json, corrected_transcript_json, report_md, meta_json)
+                VALUES (:id, :code, :title, :host, :created, :ended, :dur, :parts, :raw, :corr, :md, :meta)
+            """), {
+                "id": mid, "code": code, "title": ttl, "host": hostn,
+                "created": created, "ended": ended, "dur": dur,
+                "parts": json.dumps(parts_list), "raw": rawj, "corr": corrj,
+                "md": report["markdown"], "meta": json.dumps(met)
+            })
             conn.commit()
         return {"success": True, "report_id": mid, "note": "multipart fallback used"}
 
@@ -692,11 +702,13 @@ async def list_reports():
     with engine.connect() as conn:
         rows = conn.execute(text("SELECT id, title, created_at, ended_at, duration_sec, participants_json, meta_json FROM meetings ORDER BY created_at DESC LIMIT 40")).fetchall()
     out = []
+    now = time.time()
     for r in rows:
         meta = json.loads(r.meta_json or "{}")
+        ca = r.created_at or r.ended_at or now
         out.append({
             "id": r.id, "title": r.title,
-            "created_at": r.created_at, "duration_min": int(r.duration_sec or 0) // 60,
+            "created_at": ca, "duration_min": int(r.duration_sec or 0) // 60,
             "num_participants": len(json.loads(r.participants_json or "[]")),
             "num_corrections": meta.get("num_corrections", 0)
         })
@@ -727,13 +739,11 @@ async def regen_report(req: Request):
     if mode == "ollama":
         ollama_res = await generate_with_ollama(title, " ".join(s["text"] for s in corrected), "")
         if ollama_res:
-            # REAL FIX: Use Ollama structured output to build superior report (merge with timeline from corrected)
             base = generate_heuristic_report(title, participants[0] if participants else "Хост", participants, dur, raw, corrected, meta)
             ollama_summary = ollama_res.get("summary", base["summary"])
             ollama_decisions = ollama_res.get("key_decisions", base["decisions"])
             ollama_actions = ollama_res.get("action_items", base["action_items"])
             ollama_kb = ollama_res.get("mentioned_kb_terms", base["kb_terms"])
-            # Rebuild markdown with Ollama content + server timeline
             timeline_str = "\n".join(base["timeline"][:55])
             md = f"""# Отчёт о встрече: {title}
 
@@ -776,11 +786,6 @@ async def ollama_status_api():
     return ollama_status()
 
 
-# ==================== SERVE FRONTEND (MVP: static/index.html - clean & editable) ====================
-# UI extracted from previous monolith for real maintainability and good developer UX.
-# `python main.py` continues to be the only command needed.
-# Future: optional bundler step to produce a true single-file distribution if desired.
-
 @app.get("/", response_class=HTMLResponse)
 async def root():
     path = os.path.join(BASE_DIR, "static", "index.html")
@@ -809,18 +814,14 @@ async def health():
 async def startup_event():
     init_db()
     init_knowledge_base()
-    print("\n" + "="*72)
-    print("  PyIntelMeet MVP v1.0 — ГОТОВ К ДЕМОНСТРАЦИИ / ЗАЩИТЕ НИР")
-    print("="*72)
     print(f"  URL:            http://127.0.0.1:8000  (или :{os.getenv('PORT',8000)})")
-    print(f"  Frontend:       static/index.html (редактируйте напрямую)")
-    print(f"  Data:           {DATA_DIR}  (БД + записи аудио)")
-    print(f"  Chroma KB:      {'OK' if HAS_CHROMA else 'OFF (alias mode only)'}")
+    print(f"  Frontend:       static/index.html")
+    print(f"  Data:           {DATA_DIR}")
+    print(f"  Chroma KB:      {'OK' if HAS_CHROMA else 'OFF'}")
     oll = ollama_status()
     print(f"  Ollama:         {'ON (' + oll.get('model','?') + ')' if oll.get('available') else 'OFF (heuristic only)'}")
     print("  Chrome/Edge:    2+ вкладки → Создать/Демо → говорите технические термины!")
     print("  Health:         /health")
-    print("="*72 + "\n")
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))
